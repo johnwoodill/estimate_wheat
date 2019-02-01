@@ -41,4 +41,28 @@ for (i in unique(states)){
     dat <- rbind(dat, hdat, pdat, qdat)
     print(i)
 }
-  
+
+saveRDS(dat, "data/wheat_data.rds")
+
+ndat <- readRDS("data/full_ag_data.rds")
+head(ndat)
+
+head(dat)
+dat$fips <- as.numeric(paste0(dat$state_fips_code, dat$county_code))
+#dat$Value <- as.numeric(gsub(",", "", dat$Value))
+mdat <- select(dat, year, state_alpha, fips, short_desc, Value)
+mdat$row <- 1:nrow(mdat)
+ldat <- spread(mdat, key=short_desc, value=Value)
+ldat <- ldat %>% 
+    group_by(state_alpha, fips, year) %>% 
+    summarise_each(funs(sum(., na.rm=TRUE))) 
+ldat$wheat_irrigated_a <- ifelse(ldat$`WHEAT - ACRES HARVESTED` != 0, ldat$`WHEAT, IRRIGATED - ACRES HARVESTED`/ldat$`WHEAT - ACRES HARVESTED`, 0)
+ldat$wheat_irrigated_a <- ifelse(ldat$wheat_irrigated_a > 1, ((ldat$`WHEAT, IRRIGATED - ACRES HARVESTED`)/100)/ldat$`WHEAT - ACRES HARVESTED`, ldat$wheat_irrigated_a)
+summary(ldat$wheat_irrigated_a)
+
+ldat <- select(ldat, state_alpha, fips, year, wheat_irrigated_a)
+names(ldat)[1] <- "state"
+ldat$state <- tolower(ldat$state)
+ldat$year <- as.numeric(ldat$year)
+ndat <- left_join(ndat, ldat, by = c("state", "fips", "year"))
+saveRDS(ndat, "data/reg_data.rds")
